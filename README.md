@@ -1,8 +1,39 @@
 # Langgraph Tutorial
 
->LangGraph is a framework that allows you to build production-ready applications by giving you control tools over the flow of your agent.
+This repository demonstrates a LangGraph-powered AI agent that processes policy documents and answers user queries about data classification and company policies. 
+
+The agent uses a reactive workflow pattern with tool integration, allowing it to retrieve relevant information from documents and provide concise, focused responses. It supports multiple LLM providers (Ollama, Anthropic) with verbose execution tracking that shows step-by-step agent decision-making and tool usage. 
+
+The system implements best practices for agent architecture including proper state management, error handling, and configurable execution modes.
+
+
+## LangGraph vs Traditional Agentic RAG
+
+This implementation differs from traditional agentic RAG systems in several key ways:
+
+| Aspect | This LangGraph Repo | Traditional Agentic RAG |
+|--------|-------------------|------------------------|
+| **Retrieval** | File-based, returns full document | Vector similarity, returns relevant chunks |
+| **Flow Control** | Explicit graph with conditional edges | Linear retrieve → generate pipeline |
+| **State Management** | Persistent conversation state | Stateless or simple context |
+| **Tool Integration** | Multi-tool orchestration possible | Primarily retrieval-focused |
+| **Decision Making** | Agent decides when/how to use tools | Automatic retrieval for every query |
+| **Workflow Visibility** | Full execution tracing with verbose mode | Black-box retrieval + generation |
+
+### Key Advantages of This Approach:
+
+- ✅ **Agent autonomy** - decides when to retrieve information
+- ✅ **Multi-tool capability** - can use various information sources
+- ✅ **Workflow transparency** - you can see every decision step
+- ✅ **State persistence** - maintains conversation context
+- ✅ **Conditional logic** - different paths for different query types
+
+This makes it more of a **"workflow-driven agent with tools"** rather than a pure RAG system, providing greater flexibility and control over the information retrieval and response generation process.
 
 ## Benefits of Langgraph
+
+>LangGraph is a framework that allows you to build production-ready applications by giving you control tools over the flow of your agent.
+
 
 >LangGraph is particularly valuable when you need Control over your applications. It gives you the tools to build an application that follows a predictable process while still leveraging the power of LLMs.
 
@@ -18,7 +49,7 @@ Notes on repo:
 - Used Augment Code as the code copilot.
 - Use Ollama for local model execution.
 
-Sample output:
+Sample output for "What are the levels of data classification?":
 
 ```
 ================================== Ai Message ==================================
@@ -31,6 +62,7 @@ There are three main levels of data classification: Public, Internal, and Confid
 
 These classifications guide how data should be handled based on sensitivity and access rights.
 ```
+
 
 ## Setup
 
