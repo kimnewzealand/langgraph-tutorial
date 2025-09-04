@@ -48,6 +48,7 @@ See tutorial https://huggingface.co/learn/agents-course/en/unit2/langgraph/intro
 Notes on repo:
 - Used Augment Code as the code copilot.
 - Use Ollama for local model execution.
+- The model selected is `qwen2:7b` where the "7b" indicates it has 7 billion parameters, making it suitable for many conversational and reasoning tasks while being efficient enough to run on consumer hardware.
 
 Sample output for "What are the levels of data classification?":
 

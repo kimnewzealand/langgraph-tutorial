@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 from typing import TypedDict, List, Dict, Any, Optional, Annotated
 
 from dotenv import load_dotenv
@@ -12,15 +13,20 @@ from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
+from ollama_utils import check_ollama_status,warm_up_model
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Constants
+# LLM parmameters
 DEFAULT_ANTHROPIC_MODEL = "claude-3-haiku-20240307"
 DEFAULT_OLLAMA_MODEL = "qwen2:7b"
 OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_THREAD_ID = "1"
+# Set environment variables for better performance
+OLLAMA_NUM_PARALLEL=4
+OLLAMA_MAX_LOADED_MODELS=2
+OLLAMA_FLASH_ATTENTION=1
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,40 +61,52 @@ class Application:
         self.mermaid_graph: Optional[str] = None
         self.react_graph: Optional[StateGraph] = None
         self.workflow: Optional[StateGraph] = None
+        self.provider: Optional[str] = "ollama"
 
 
     @tool
     def retrieve_content(query: str) -> List[str]:
-        """Function to retrieve usable documents for AI assistant"""
+        """Fast content retrieval"""
         try:
             file_path = "documents/sample_data.txt"
+        
             with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                return [content]
+                content= f.read()
+        
+            # Quick keyword filtering instead of returning full document
+            lines = content.split('\n')
+            query_words = query.lower().split()
+            relevant_lines = [
+                line for line in lines 
+                if any(word in line.lower() for word in query_words)
+            ][:5]  # Limit to 5 most relevant lines
+        
+            return relevant_lines if relevant_lines else [content[:500]]
+        
         except Exception as e:
             logger.error(f"Error reading {file_path}: {e}")
-            return []
+            return ["Error retrieving content."]
   
-    def setup_llm(self, provider: str = "ollama", model_name: Optional[str] = None) -> bool:
+    def setup_llm(self, model_name: Optional[str] = None) -> bool:
         """Setup the Language Model with multiple provider options.
 
         Args:
-            provider: LLM provider ("ollama" or "anthropic")
             model_name: Optional specific model name
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            if provider == "ollama":
+            if self.provider == "ollama":
                 model_name = model_name or DEFAULT_OLLAMA_MODEL
                 self.model = ChatOllama(
                     model=model_name,
                     base_url=OLLAMA_BASE_URL,
-                    temperature=0
+                    temperature=0,
+                    num_ctx=1024,        # Reduce context window if not needed
                 ).bind_tools([self.retrieve_content])
 
-            elif provider == "anthropic":
+            elif self.provider == "anthropic":
                 model_name = model_name or DEFAULT_ANTHROPIC_MODEL
                 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
                 if not anthropic_api_key:
@@ -100,20 +118,18 @@ class Application:
                 ).bind_tools([self.retrieve_content])
 
             else:
-                raise ValueError(f"Unsupported provider: {provider}. Supported: 'ollama', 'anthropic'")
-
-            logger.info(f"✅ {provider.title()} setup successful with model: {model_name}")
+                raise ValueError(f"Unsupported provider: {self.provider}. Supported: 'ollama', 'anthropic'")
             return True
 
         except ImportError as e:
-            logger.error(f"Missing package for {provider}: {e}")
-            logger.info(f"Install with: pip install langchain-{provider}")
+            logger.error(f"Missing package for {self.provider}: {e}")
+            logger.info(f"Install with: pip install langchain-{self.provider}")
             return False
         except ValueError as e:
             logger.error(f"Configuration error: {e}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error setting up {provider}: {e}")
+            logger.error(f"Unexpected error setting up {self.provider}: {e}")
             return False
 
     def call_model(self, state: MessagesState) -> Dict[str, List[Any]]:
@@ -210,11 +226,19 @@ def main(verbose: bool = True) -> None:
     try:
         graph = Application()
         logger.info("Application initialized")
+        
     except Exception as e:
         logger.error(f"Failed to initialize application: {e}")
         return
     if graph.setup_llm():
-        logger.info("LLM setup successfully")
+        if graph.provider == "ollama":
+            logger.info(f"  Check if Ollama service is running with model {DEFAULT_OLLAMA_MODEL}")
+            if check_ollama_status(DEFAULT_OLLAMA_MODEL):
+                if warm_up_model(graph,DEFAULT_OLLAMA_MODEL):
+                    logger.info("✅ LLM setup successful")
+            else:
+                logger.error("Failed to setup LLM. Exiting.")
+                return
     else:
         logger.error("Failed to setup LLM. Exiting.")
         return
@@ -227,7 +251,7 @@ def main(verbose: bool = True) -> None:
     try:
         messages = [HumanMessage(content="What is the levels of data classification?")]
         config = {"configurable": {"thread_id": DEFAULT_THREAD_ID}}
-
+        start_time = time.time()
         if verbose:
             print("\n🔄 Starting LangGraph execution with verbose output...")
             print("=" * 60)
@@ -240,15 +264,16 @@ def main(verbose: bool = True) -> None:
                     print(f"   Node '{node_name}' output:")
                     if 'messages' in node_output:
                         for msg in node_output['messages']:
-                            print(f"      {type(msg).__name__}: {msg.content[:100]}...")
+                            print(f"{type(msg).__name__}: {msg.content[:100]}...")
                     else:
-                        print(f"      {node_output}")
+                        print(f"{node_output}")
                 print("-" * 40)
         else:
             # Simple non-verbose execution
             print("\n🔄 Running LangGraph...")
             graph.react_graph.invoke({"messages": messages}, config)
-
+        end_time = time.time()
+        logger.info(f"Model response time: {end_time - start_time:.2f} seconds")
         print("\n✅ Final execution result:")
         print("=" * 60)
 
