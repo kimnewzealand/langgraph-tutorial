@@ -1,7 +1,8 @@
 import logging
 import os
-import sys
+import re
 import time
+from datetime import datetime, timedelta
 from typing import TypedDict, List, Dict, Any, Optional, Annotated
 
 from dotenv import load_dotenv
@@ -49,7 +50,7 @@ class AgentState(TypedDict):
     policy_status: Optional[str]
     # Policy version number
     policy_version: Optional[str]
-    # Track conversation with LLM for analysis
+    # Adds the latest message rather than overwriting it with the latest state.
     messages: Annotated[list[AnyMessage], add_messages]
 
 class Application:
@@ -73,19 +74,181 @@ class Application:
             with open(file_path, "r", encoding="utf-8") as f:
                 content= f.read()
         
-            # Quick keyword filtering instead of returning full document
-            lines = content.split('\n')
-            query_words = query.lower().split()
-            relevant_lines = [
-                line for line in lines 
-                if any(word in line.lower() for word in query_words)
-            ][:5]  # Limit to 5 most relevant lines
-        
-            return relevant_lines if relevant_lines else [content[:500]]
+            return content
         
         except Exception as e:
             logger.error(f"Error reading {file_path}: {e}")
             return ["Error retrieving content."]
+        
+    @tool
+    def create_action_plan(query: str) -> List[str]:
+        """Generate a chronologically ordered action plan based on policy deadlines and requirements.
+
+        Args:
+            query: The query to analyze for action items and deadlines
+
+        Returns:
+            List of formatted action items with calculated due dates, sorted chronologically
+        """
+        try:
+            logger.info("Creating action plan based on policy deadlines")
+
+            # First, retrieve the content to analyze
+            file_path = "documents/sample_data.txt"
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Define deadline patterns to search for
+            deadline_patterns = {
+                r'within (\d+) hours?': lambda m: datetime.now() + timedelta(hours=int(m.group(1))),
+                r'within (\d+) business days?': lambda m: datetime.now() + timedelta(days=int(m.group(1))),
+                r'within (\d+) days?': lambda m: datetime.now() + timedelta(days=int(m.group(1))),
+                r'quarterly by the (\d+)(?:st|nd|rd|th)': lambda m: self._get_next_quarterly_date(int(m.group(1))),
+                r'by December (\d+)(?:st|nd|rd|th)': lambda m: datetime(datetime.now().year, 12, int(m.group(1))),
+                r'by the (\d+)(?:st|nd|rd|th) of each quarter': lambda m: self._get_next_quarterly_date(int(m.group(1))),
+                r'annually.*by December (\d+)(?:st|nd|rd|th)': lambda m: datetime(datetime.now().year, 12, int(m.group(1)))
+            }
+
+            # Action keywords to identify actionable items
+            action_keywords = [
+                'approval', 'approved', 'training', 'review', 'audit', 'conduct',
+                'monitor', 'report', 'revoke', 'grant', 'address', 'required'
+            ]
+
+            action_items = []
+            lines = content.split('\n')
+
+            for line_num, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Check if line contains action keywords
+                has_action = any(keyword in line.lower() for keyword in action_keywords)
+
+                if has_action:
+                    # Look for deadline patterns in this line
+                    for pattern, date_func in deadline_patterns.items():
+                        matches = re.finditer(pattern, line, re.IGNORECASE)
+                        for match in matches:
+                            try:
+                                due_date = date_func(match)
+
+                                # Extract policy section (look for numbered sections)
+                                section_match = re.search(r'(\d+(?:\.\d+)*)', line)
+                                section = section_match.group(1) if section_match else f"Line {line_num}"
+
+                                # Clean up the action description
+                                action_desc = re.sub(r'\s+', ' ', line).strip()
+                                if len(action_desc) > 100:
+                                    action_desc = action_desc[:97] + "..."
+
+                                action_items.append({
+                                    'due_date': due_date,
+                                    'action': action_desc,
+                                    'section': section,
+                                    'days_until': (due_date - datetime.now()).days
+                                })
+                            except Exception as e:
+                                logger.warning(f"Error parsing date from line {line_num}: {e}")
+
+            # Sort by due date (earliest first)
+            action_items.sort(key=lambda x: x['due_date'])
+
+            # Format the results
+            if not action_items:
+                return ["No time-sensitive action items found in the policy documents."]
+
+            formatted_items = []
+            for item in action_items:
+                due_date_str = item['due_date'].strftime("%Y-%m-%d")
+                days_until = item['days_until']
+
+                if days_until < 0:
+                    urgency = "⚠️ OVERDUE"
+                elif days_until <= 7:
+                    urgency = "🔴 URGENT"
+                elif days_until <= 30:
+                    urgency = "🟡 SOON"
+                else:
+                    urgency = "🟢 PLANNED"
+
+                formatted_item = (
+                    f"{urgency} | Due: {due_date_str} ({days_until:+d} days) | "
+                    f"Section {item['section']}: {item['action']}"
+                )
+                formatted_items.append(formatted_item)
+
+            return formatted_items
+
+        except Exception as e:
+            logger.error(f"Error creating action plan: {e}")
+            return [f"Error creating action plan: {str(e)}"]
+
+    def policy_analysis_node(self, state: MessagesState) -> Dict[str, List[Any]]:
+        """Custom node that automatically calls both tools in sequence"""
+        try:
+            logger.info("🔍 Running comprehensive policy analysis...")
+
+            # Get the user's query from the last message
+            last_message = state["messages"][-1]
+            query = last_message.content
+
+            # Step 1: Retrieve policy content
+            logger.info("📄 Step 1: Retrieving policy content...")
+            policy_content = self.retrieve_content(query)
+
+            # Step 2: Create action plan
+            logger.info("📋 Step 2: Creating action plan...")
+            action_plan = self.create_action_plan(query)
+
+            # Combine results into a comprehensive response
+            combined_response = []
+            combined_response.extend(policy_content)
+            combined_response.append("\n--- COMPLIANCE ACTION PLAN ---")
+            combined_response.extend(action_plan)
+
+            # Create a response message
+            from langchain_core.messages import AIMessage
+            response_content = "\n".join(combined_response)
+            response = AIMessage(content=response_content)
+
+            return {"messages": [response]}
+
+        except Exception as e:
+            logger.error(f"Error in policy analysis: {e}")
+            error_response = AIMessage(content=f"Error during policy analysis: {str(e)}")
+            return {"messages": [error_response]}
+
+    def _get_next_quarterly_date(self, day: int) -> datetime:
+        """Calculate the next quarterly deadline date.
+
+        Args:
+            day: Day of the month for the quarterly deadline
+
+        Returns:
+            Next quarterly date (March, June, September, or December)
+        """
+        current_date = datetime.now()
+        current_year = current_date.year
+        current_month = current_date.month
+
+        # Quarterly months: March (3), June (6), September (9), December (12)
+        quarterly_months = [3, 6, 9, 12]
+
+        # Find the next quarterly month
+        next_quarter_month = None
+        for month in quarterly_months:
+            quarter_date = datetime(current_year, month, day)
+            if quarter_date > current_date:
+                next_quarter_month = month
+                break
+
+        # If no quarter found in current year, use March of next year
+        if next_quarter_month is None:
+            return datetime(current_year + 1, 3, day)
+
+        return datetime(current_year, next_quarter_month, day)
   
     def setup_llm(self, model_name: Optional[str] = None) -> bool:
         """Setup the Language Model with multiple provider options.
@@ -104,7 +267,7 @@ class Application:
                     base_url=OLLAMA_BASE_URL,
                     temperature=0,
                     num_ctx=1024,        # Reduce context window if not needed
-                ).bind_tools([self.retrieve_content])
+                ).bind_tools([self.retrieve_content, self.create_action_plan])
 
             elif self.provider == "anthropic":
                 model_name = model_name or DEFAULT_ANTHROPIC_MODEL
@@ -115,7 +278,7 @@ class Application:
                 self.model = ChatAnthropic(
                     model=model_name,
                     anthropic_api_key=anthropic_api_key
-                ).bind_tools([self.retrieve_content])
+                ).bind_tools([self.retrieve_content, self.create_action_plan])
 
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}. Supported: 'ollama', 'anthropic'")
@@ -146,13 +309,21 @@ class Application:
             raise RuntimeError("Model not initialized. Call setup_llm() first.")
 
         # Add system message for better behavior if not already present
-        system_content = """You are a helpful assistant. When using tools to retrieve information:
-1. Only extract the specific information requested
-2. Provide concise, direct answers (1-2 sentences maximum)
-3. Do not repeat or include the entire document content in your response
-4. Focus on answering the exact question asked
+        system_content = """You are a helpful policy compliance assistant. When users ask about policies:
 
-Example: If asked "What are the levels of data classification?" respond with "There are three levels of data classification: Public, Internal, and Confidential." Do not include the full document text."""
+1. ALWAYS use retrieve_content first to get policy information
+2. AFTER retrieving policy content, ALWAYS use create_action_plan to identify deadlines and compliance requirements
+3. Provide both the direct answer AND actionable compliance items
+4. Keep answers concise but comprehensive
+
+Example workflow:
+- User asks: "What are the data classification levels?"
+- You should:
+  a) Call retrieve_content to get policy details
+  b) Call create_action_plan to find related deadlines/actions
+  c) Answer: "There are three levels: Public, Internal, Confidential. Here are related compliance actions: [action plan items]"
+
+Always be proactive in helping users understand both the policy content AND their compliance obligations."""
 
         # Check if system message already exists
         has_system_message = any(
@@ -174,7 +345,7 @@ Example: If asked "What are the levels of data classification?" respond with "Th
         try:
             workflow = StateGraph(AgentState)
             # Define nodes: these do the work
-            workflow.add_node("tools", ToolNode([self.retrieve_content]))
+            workflow.add_node("tools", ToolNode([self.retrieve_content,self.create_action_plan]))
             workflow.add_node("agent", self.call_model)
 
             # Define edges: these determine how the control flow moves
@@ -249,7 +420,7 @@ def main(verbose: bool = True) -> None:
         return
     
     try:
-        messages = [HumanMessage(content="What is the levels of data classification?")]
+        messages = [HumanMessage(content="What are the levels of data classification? Also create an action plan with deadlines for any compliance requirements related to data classification.")]
         config = {"configurable": {"thread_id": DEFAULT_THREAD_ID}}
         start_time = time.time()
         if verbose:

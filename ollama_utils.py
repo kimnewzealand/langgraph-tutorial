@@ -1,4 +1,3 @@
-import sys
 from typing import Any, Dict
 import requests
 import requests
@@ -41,8 +40,8 @@ def warm_up_model(self,model_name: str) -> bool:
         test_message = [HumanMessage(content="Hello")]
         response = self.model.invoke(test_message)
         
-        if response.status_code == 200:
-            logger.info(f"  Model {model_name} warmed up successfully")
+        if response:
+            logger.info(f"  Model {model_name} warmed up successfully with Hello, {response}")
             return True
         else:
             logger.error(f"❌ Failed to warm up model {model_name}")
