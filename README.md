@@ -9,6 +9,7 @@ This repository demonstrates an intelligent policy compliance assistant that aut
 3. **Interactive Query Processing**: Natural language queries with intelligent routing based on user intent and document status
 4. **Compliance Action Planning**: Framework for generating chronologically ordered compliance tasks with timeframes and deadlines
 5. **Gap Analysis Capability**: Foundation for comparing policy documents with market updates to identify missing requirements
+6. **Offline LLM**: All models run locally on RAM using Ollama to reduce cost and security concerns
 
 
 
@@ -26,34 +27,23 @@ LangGraph uses a directed graph structure to define the flow of the application 
 - Edges define the possible transitions between steps. They can be direct or conditional.
 - State is user defined and maintained and passed between nodes during execution. State is the central concept in LangGraph. It represents all the information that flows through your application.
 
+This is a simple high level demonstration of[LangGraph concepts and flows](https://colab.research.google.com/github/langchain-ai/langchain-academy/blob/main/module-1/simple-graph.ipynb).
 
-This agent follows what’s known as the ReAct pattern (Reason-Act-Observe)
-
-**Reason**: Analyzes user queries and current state to determine optimal workflow path
-**Act**: Uses appropriate tools (document loading, semantic search, action planning) based on intelligent routing
-**Observe**: Processes results with relevance ranking and content optimization
-**Decide**: Routes to next appropriate node based on document status and user intent
-**Repeat**: Continues until user needs are fully addressed with comprehensive state tracking
-
-See [HuggingFace tutorial](https://huggingface.co/learn/agents-course/en/unit2/langgraph/introduction)
+Also see [HuggingFace LangGraphtutorial](https://huggingface.co/learn/agents-course/en/unit2/langgraph/introduction)
 
 See current workflow implementation:
 
 ```mermaid
 graph LR
-    A[START] --> B[Check Documents Status]
-    B --> C{Decision Node}
-    C -->|Documents Needed| D[Load Documents Node]
-    C -->|Documents Ready| E[Agent Node]
-    D --> E
-    E --> F{Tool Selection}
-    F -->|Query Vectorstore| G[Semantic Search Tool]
-    F -->|Create Action Plan| H[Action Planning Tool]
-    F -->|Load Documents| I[Document Loading Tool]
-    F -->|Complete| J[END]
-    G --> E
-    H --> E
-    I --> E
+    A[START] --> B{Documents Decision}
+    B -->|Documents Needed| C[Tools Node]
+    B -->|Documents Ready| D[Agent Node]
+    C --> D
+    D --> E{ToolNode}
+    E -->|Query Vectorstore| C
+    E -->|Create Action Plan| C
+    E -->|Load Documents| C
+    E -->|Complete| F[END]
 ```
 
 ## 📊 **Current Implementation Features**
@@ -63,8 +53,8 @@ graph LR
 - **Semantic Search**: Vector-based search with relevance ranking (High/Medium/Low) for precise information retrieval
 - **Content Optimization**: Intelligent content truncation to prevent information overload while maintaining accuracy
 
-### **Enhanced State Management**
-- **Comprehensive Tracking**: 20+ state fields across 6 categories including conversation history, tool execution, and performance analytics
+### **Streamlined State Management**
+- **Essential Tracking**: 8 core state fields for document management, tool execution, workflow tracking, and performance monitoring
 - **Decision Intelligence**: Smart routing based on document status and user intent analysis
 - **Workflow Persistence**: Complete conversation state maintained across interactions
 

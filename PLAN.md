@@ -18,7 +18,7 @@ This repository demonstrates a LangGraph-powered intelligent policy compliance a
 ### 🔧 **Core Architecture - COMPLETED**
 - ✅ **LangGraph Workflow**: State-based graph with agent and tools nodes
 - ✅ **Decision Node System**: Intelligent routing based on user intent and document status
-- ✅ **Enhanced State Management**: Comprehensive tracking with 20+ state fields across 6 categories
+- ✅ **Streamlined State Management**: Essential tracking with 8 core state fields for optimal performance
 - ✅ **Three-Tool Architecture**: Separated concerns for document loading, querying, and planning
 - ✅ **InMemoryVectorStore**: Optimized vector storage with relevance ranking
 - ✅ **Ollama Integration**: Local LLM llama3.2:3b with nomic-embed-text embeddings
@@ -46,23 +46,23 @@ This repository demonstrates a LangGraph-powered intelligent policy compliance a
 
 ### 📊 **Intelligent Workflow Management - COMPLETED**
 
-#### **Decision Node Architecture**
+#### **Optimized Single Decision Architecture**
 ```
-User Query → Check Documents → Decision Logic → Load Documents (if needed)
-                                    ↓                    ↓
-                              Agent Processing ← Documents Ready
-                                    ↓
-                              Tool Execution → Query Vector Store
-                                    ↓
-                              Final Response
+User Query → Decision Logic → Tools Node (if documents needed)
+                    ↓                    ↓
+              Agent Processing ← Tool Results
+                    ↓
+              Tool Execution → load_documents_tool / query_vectorstore_tool
+                    ↓
+              Final Response
 ```
 
-#### **Enhanced State Management**
-- **Comprehensive Tracking**: 20+ state fields across 6 categories
+#### **Streamlined State Management**
+- **Essential Tracking**: 8 core state fields for optimal performance
 - **Document Status**: Real-time tracking of loading and availability
 - **Tool Execution**: History and results of all tool usage
-- **User Context**: Session management and conversation persistence
-- **Performance Analytics**: Timing, tokens, and resource usage
+- **Workflow Tracking**: Current step and error count monitoring
+- **Performance Analytics**: Response timing and execution metrics
 
 #### **Key Benefits Achieved**
 - **Intelligence**: Automatic document loading based on user intent

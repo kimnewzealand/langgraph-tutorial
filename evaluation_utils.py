@@ -41,17 +41,50 @@ def write_evaluation_log(graph: 'Application', result: str, details: str, execut
         timestamp_str = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
         log_filename = os.path.join(logs_dir, f"evaluation_{timestamp_str}.json")
         graph_info = {
+            # Model Configuration
             "provider": getattr(graph, 'provider', 'unknown'),
             "chat_model_name": getattr(graph.model, 'model', 'unknown') if hasattr(graph, 'model') else 'unknown',
             "temperature": getattr(graph.model, 'temperature', 'unknown') if hasattr(graph, 'model') else 'unknown',
             "embedding_model_name": DEFAULT_EMBEDDING_MODEL,
             "base_url": getattr(graph.model, 'base_url', 'unknown') if hasattr(graph, 'model') else 'unknown',
+            "num_ctx": getattr(graph.model, 'num_ctx', 'unknown') if hasattr(graph, 'model') else 'unknown',
+
+            # Document and Vectorstore Status
+            "documents_loaded": getattr(graph, 'documents_loaded', False),
+            "documents_dir": getattr(graph, 'documents_dir', 'unknown'),
+            "vectorstore_available": graph.vectorstore is not None if hasattr(graph, 'vectorstore') else False,
+            "retriever_available": graph.retriever is not None if hasattr(graph, 'retriever') else False,
+
+            # Graph and Workflow Status
+            "react_graph_compiled": graph.react_graph is not None if hasattr(graph, 'react_graph') else False,
+            "mermaid_graph_available": graph.mermaid_graph is not None if hasattr(graph, 'mermaid_graph') else False,
+
+            # Tools Information
+            "tools_available": [
+                getattr(graph.load_documents_tool, 'name', 'load_documents_tool') if hasattr(graph, 'load_documents_tool') else None,
+                getattr(graph.query_vectorstore_tool, 'name', 'query_vectorstore_tool') if hasattr(graph, 'query_vectorstore_tool') else None,
+                getattr(graph.create_action_plan, 'name', 'create_action_plan') if hasattr(graph, 'create_action_plan') else None
+            ],
+
+            # Cache and Performance
+            "content_cache_enabled": hasattr(graph, '_content_cache'),
+            "initial_content_cached": graph.initial_content is not None if hasattr(graph, 'initial_content') else False,
+
+            # Workflow Architecture
+            "workflow_type": "simplified_decision_routing",
+            "state_fields": [
+                "messages", "documents_loaded", "last_query", "tools_used",
+                "tool_results", "current_step", "error_count", "response_time"
+            ],
+            "decision_functions": ["documents_decision"],
+            "graph_nodes": ["agent", "tools"],
+            "conditional_edges": ["START->documents_decision", "agent->tools_condition"],
+            "memory_enabled": True  # MemorySaver is used
         }
 
         system_info = {
             "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
             "platform": os.name,
-            "cache_enabled": hasattr(graph, '_content_cache')
         }
 
         log_entry = {
@@ -63,9 +96,6 @@ def write_evaluation_log(graph: 'Application', result: str, details: str, execut
             },
             "graph_info": graph_info,
             "system": system_info,
-            "workflow_features": {
-                "description": "Policy compliance analysis system",
-            }
         }
 
         with open(log_filename, "w", encoding="utf-8") as f:

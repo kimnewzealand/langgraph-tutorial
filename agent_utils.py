@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import operator
 from typing import TypedDict, List, Dict, Any, Optional, Annotated
 
@@ -26,128 +27,41 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class AgentState(TypedDict):
-    """Enhanced state for the policy compliance agent with comprehensive tracking."""
+    """Streamlined state for the policy compliance agent with essential tracking fields."""
 
     messages: Annotated[list[AnyMessage], add_messages]
 
     documents_loaded: bool
     last_query: Optional[str]
-    query_results: Optional[List[str]]
 
     tools_used: Annotated[List[str], operator.add]
     tool_results: Dict[str, Any]
 
-    user_id: Optional[str]
-    session_id: Optional[str]
-    conversation_context: Dict[str, Any]
-
-    current_policy_focus: Optional[str]  # e.g., "data_classification", "access_control"
-    compliance_status: Dict[str, str]    # Track compliance status for different areas
-    action_plans: List[Dict[str, Any]]   # Store generated action plans
-
     current_step: Optional[str]          # Track current workflow step
-    next_actions: List[str]              # Planned next actions
     error_count: int                     # Track errors for recovery
 
     response_time: Optional[float]
 
 
-def create_initial_state(user_id: Optional[str] = None, session_id: Optional[str] = None) -> AgentState:
-    """Create an initial agent state with default values for all tracking fields.
+def create_initial_state() -> AgentState:
+    """Create an initial agent state with default values for essential tracking fields.
 
-    Initializes a comprehensive state structure with empty collections and default
-    values for all 20+ state fields across 6 categories including conversation,
-    document management, tool execution, user context, policy compliance, and analytics.
-
-    Args:
-        user_id: Optional unique identifier for the user
-        session_id: Optional unique identifier for the conversation session
+    Initializes a streamlined state structure with 8 core fields for document
+    management, tool execution, workflow tracking, and performance monitoring.
 
     Returns:
-        Fully initialized AgentState with all fields set to appropriate defaults
+        Fully initialized AgentState with all essential fields set to appropriate defaults
     """
     return AgentState(
         messages=[],
         documents_loaded=False,
         last_query=None,
-        query_results=None,
         tools_used=[],
         tool_results={},
-        user_id=user_id,
-        session_id=session_id,
-        conversation_context={},
-        current_policy_focus=None,
-        compliance_status={},
-        action_plans=[],
         current_step=None,
-        next_actions=[],
         error_count=0,
-        response_time=None,
-        tokens_used=None,
-        cost_tracking={}
+        response_time=None
     )
-
-
-def update_state_with_tool_result(state: AgentState, tool_name: str, result: Any) -> AgentState:
-    """Update agent state with tool execution results and metadata.
-
-    Tracks tool usage history, stores results, and updates specific state fields
-    based on the type of tool executed. Maintains comprehensive execution history
-    for debugging and analytics purposes.
-
-    Args:
-        state: Current agent state to update
-        tool_name: Name of the tool that was executed
-        result: Result returned by the tool execution
-
-    Returns:
-        Updated agent state with new tool execution information
-    """
-    state["tools_used"].append(tool_name)
-    state["tool_results"][tool_name] = result
-
-    # Update specific state based on tool type
-    if tool_name == "load_documents_tool":
-        state["documents_loaded"] = True if result else False
-    elif tool_name == "query_vectorstore_tool":
-        state["query_results"] = result
-    elif tool_name == "create_action_plan":
-        if isinstance(result, dict):
-            state["action_plans"].append(result)
-
-    return state
-
-
-def get_conversation_summary(state: AgentState) -> str:
-    """Generate a concise summary of the current conversation state and progress.
-
-    Creates a human-readable summary showing document loading status, tools used,
-    action plans created, and overall conversation progress. Useful for debugging
-    and providing status updates to users.
-
-    Args:
-        state: Current agent state containing conversation history and metadata
-
-    Returns:
-        Formatted string summarizing the conversation state and key activities
-    """
-    summary_parts = []
-
-    if state["documents_loaded"]:
-        summary_parts.append("✅ Documents loaded")
-    else:
-        summary_parts.append("❌ Documents not loaded")
-
-    if state["tools_used"]:
-        summary_parts.append(f"🔧 Tools used: {', '.join(set(state['tools_used']))}")
-
-    if state["current_policy_focus"]:
-        summary_parts.append(f"📋 Focus: {state['current_policy_focus']}")
-
-    if state["action_plans"]:
-        summary_parts.append(f"📝 Action plans: {len(state['action_plans'])}")
-
-    return " | ".join(summary_parts)
 
 class Application:
     """An application for processing policies and making recommended improvements using LangGraph."""
@@ -158,9 +72,7 @@ class Application:
         """Initialize the application with standardized retrieval and tool setup.
 
         Sets up the application instance with default configuration, initializes
-        tool definitions for document loading, vectorstore querying, and action
-        plan creation. Configures internal state for document management and
-        creates tool instances bound to the application context.
+        tool definitions. Creates tool instances bound to the application context.
 
         Returns:
             None
@@ -226,7 +138,7 @@ class Application:
                 return False
 
         @tool
-        def load_documents_tool(self) -> bool:
+        def load_documents_tool() -> str:
             """Load and embed documents into vectorstore for semantic search.
 
             Tool interface for loading policy documents and creating vector embeddings.
@@ -234,12 +146,16 @@ class Application:
             Uses the internal loading method for actual document processing.
 
             Returns:
-                True if documents are loaded (either already loaded or newly loaded), False on failure
+                Status message indicating success or failure of document loading
             """
             if self.documents_loaded:
-                return True
+                return "Documents are already loaded and ready for queries."
 
-            return _load_documents_internal()
+            result = _load_documents_internal()
+            if result:
+                return "Documents successfully loaded and embedded. Ready for queries."
+            else:
+                return "Failed to load documents. Please check the documents directory and try again."
 
         @tool
         def query_vectorstore_tool(query: str) -> List[str]:
@@ -366,7 +282,6 @@ class Application:
         Returns:
             Updated agent state with new messages and metadata
         """
-        import time
         start_time = time.time()
 
         messages = state["messages"]
@@ -460,7 +375,9 @@ You: "I'll first gather the relevant policy information, then create a tailored 
 
             state["error_count"] = 0
 
-            return {"messages": [response]}
+            # Update state with the response
+            state["messages"] = [response]
+            return state
 
         except Exception as e:
             logger.error(f"Failed to invoke model: {e}")
@@ -471,7 +388,9 @@ You: "I'll first gather the relevant policy information, then create a tailored 
             error_response = AIMessage(
                 content=f"Failed to process request: {e}"
             )
-            return {"messages": [error_response]}
+            # Update state with error response
+            state["messages"] = [error_response]
+            return state
 
     def run_agent(self, user_message: str, thread_id: str = "default") -> Dict[str, Any]:
         """Run the intelligent agent to process user queries and orchestrate tools.
@@ -490,7 +409,7 @@ You: "I'll first gather the relevant policy information, then create a tailored 
             }
 
         try:
-            initial_state = create_initial_state(user_id=None, session_id=thread_id)
+            initial_state = create_initial_state()
             initial_state["messages"] = [HumanMessage(content=user_message)]
             initial_state["current_step"] = "processing_query"
 
@@ -543,7 +462,7 @@ You: "I'll first gather the relevant policy information, then create a tailored 
                         "execution_steps": execution_steps,
                         "documents_loaded": getattr(self, 'documents_loaded', False),
                         "conversation_summary": conversation_summary,
-                        "response_time": None,  # Will be implemented when state tracking is fully integrated
+                        "response_time": None,  
                         "error_count": 0
                     }
 
@@ -583,94 +502,60 @@ You: "I'll first gather the relevant policy information, then create a tailored 
 
         return response
 
-    def check_documents_loaded(self, state: AgentState) -> AgentState:
-        """Decision node to check if documents are loaded and update state accordingly.
 
-        Args:
-            state: Current agent state
-
-        Returns:
-            Updated state with document loading status
-        """
-        documents_loaded = getattr(self, 'documents_loaded', False) and self.vectorstore is not None
-
-        state["documents_loaded"] = documents_loaded
-        state["current_step"] = "checked_documents"
-
-        if not documents_loaded:
-            logger.info("📋 Documents not loaded - will need to load before querying")
-        else:
-            logger.info("📋 Documents already loaded and ready for queries")
-
-        return state
 
     def documents_decision(self, state: AgentState) -> str:
         """Decision function to route based on document loading status and user intent.
 
+        Checks document loading status and analyzes user intent to determine optimal routing.
+        Updates state with current document status before making routing decisions.
+
         Args:
             state: Current agent state
 
         Returns:
-            Next node to execute
+            Next node to execute ("tools" or "agent")
         """
+        # Check and update document loading status
+        documents_loaded = getattr(self, 'documents_loaded', False) and self.vectorstore is not None
+        state["documents_loaded"] = documents_loaded
+        state["current_step"] = "routing_decision"
+
+        # Analyze user message for intent
         messages = state.get("messages", [])
         last_message = ""
         if messages:
             last_message = str(messages[-1].content).lower()
 
-        documents_loaded = state.get("documents_loaded", False)
+        # Log document status
+        if not documents_loaded:
+            logger.info("📋 DECISION: Documents not loaded, may need to load before querying")
+        else:
+            logger.info("📋 DECISION: Documents already loaded and ready for queries")
 
+        # Route based on user intent and document status
         if any(phrase in last_message for phrase in ["documents loaded", "status", "available"]):
             logger.info("🔍 User asking about status - routing to agent")
             return "agent"
 
         if any(phrase in last_message for phrase in ["what", "how", "classification", "policy", "compliance"]):
             if not documents_loaded:
-                logger.info("🔍 Query requires documents but not loaded - routing to load documents")
-                return "load_documents"
+                logger.info("🔍 Query requires documents but not loaded - routing to tools")
+                return "tools"
             else:
                 logger.info("🔍 Query with documents loaded - routing to agent")
                 return "agent"
 
         if any(phrase in last_message for phrase in ["plan", "create", "action", "compliance"]):
             if not documents_loaded:
-                logger.info("🔍 Action plan requires documents but not loaded - routing to load documents")
-                return "load_documents"
+                logger.info("🔍 Action plan requires documents but not loaded - routing to tools")
+                return "tools"
             else:
                 logger.info("🔍 Action plan with documents loaded - routing to agent")
                 return "agent"
 
         logger.info("🔍 Default routing to agent")
         return "agent"
-
-    def load_documents_node(self, state: AgentState) -> AgentState:
-        """Node specifically for loading documents when needed.
-
-        Args:
-            state: Current agent state
-
-        Returns:
-            Updated state after loading documents
-        """
-        logger.info("🔧 Loading documents as required by workflow...")
-
-        try:
-            result = self._load_documents_internal()
-
-            if result:
-                state["documents_loaded"] = True
-                state["current_step"] = "documents_loaded"
-                logger.info("✅ Documents loaded successfully by decision node")
-            else:
-                state["documents_loaded"] = False
-                state["current_step"] = "documents_load_failed"
-                logger.error("❌ Failed to load documents in decision node")
-        except Exception as e:
-            logger.error(f"❌ Error loading documents in decision node: {e}")
-            state["documents_loaded"] = False
-            state["current_step"] = "documents_load_failed"
-
-        return state
 
     def define_graph(self) -> bool:
         """Define the LangGraph workflow structure with decision nodes and tool orchestration.
@@ -689,27 +574,19 @@ You: "I'll first gather the relevant policy information, then create a tailored 
             # Create the workflow graph. The StateGraph is the container that holds your entire agent workflow:
             workflow = StateGraph(AgentState)
 
-            workflow.add_node("check_documents", self.check_documents_loaded)
-            workflow.add_node("load_documents", self.load_documents_node)
             workflow.add_node("agent", self.call_model)
             workflow.add_node("tools", ToolNode([self.load_documents_tool, self.query_vectorstore_tool, self.create_action_plan]))
 
-            # Define the workflow flow:
-            # 1. Start -> Check documents status
-            workflow.add_edge(START, "check_documents")
-
-            # 2. Check documents -> Decision based on user intent and document status
+            # Define the simplified workflow flow:
+            # 1. Start -> Decision based on user intent and document status
             workflow.add_conditional_edges(
-                "check_documents",
+                START,
                 self.documents_decision,
                 {
-                    "load_documents": "load_documents",
+                    "tools": "tools",
                     "agent": "agent"
                 }
             )
-
-            # 3. Load documents -> Agent (after loading)
-            workflow.add_edge("load_documents", "agent")
 
             # 4. Agent -> Tools or End (existing tool routing)
             workflow.add_conditional_edges(
