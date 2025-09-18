@@ -87,3 +87,5 @@ tmp/
 # Excel temporary files
 ~$*.xlsx
 ~$*.xls
+
+.langgraph_api
