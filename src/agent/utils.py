@@ -1,9 +1,21 @@
 from langchain_ollama import ChatOllama
 
 import requests
-import requests
 import logging
 from langchain_core.messages import HumanMessage
+from langchain_community.document_loaders import TextLoader, DirectoryLoader
+from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_ollama import OllamaEmbeddings
+
+try:
+    from src.agent.performance_monitor import monitor_performance, performance_monitor
+except ImportError:
+    # Fallback if performance monitor is not available
+    def monitor_performance(operation_name: str):
+        def decorator(func):
+            return func
+        return decorator
+    performance_monitor = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,7 +23,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL="http://localhost:11434"
+OLLAMA_BASE_URL = "http://localhost:11434"
+DEFAULT_EMBEDDING_MODEL = "nomic-embed-text:latest"
+documents_dir: str = "documents"
 
 def check_ollama_status(model_name: str) -> bool:
     """Check if Ollama service is running and specified model is available.
@@ -31,19 +45,19 @@ def check_ollama_status(model_name: str) -> bool:
     try:
         response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
         loaded_models = [model["name"] for model in response.json().get("models", [])]
-        logger.info(f"{model_name}  in downloaded models: {loaded_models}")
+        print(f"{model_name}  in downloaded models: {loaded_models}")
         if response.status_code == 200:
             if model_name in loaded_models:
                 return True
             else:
-                logger.error(f"❌ Ollama service is running but model {model_name} is not loaded.")
+                print(f"❌ Ollama service is running but model {model_name} is not loaded.")
                 return False 
         else:
-            logger.error(f"❌ Ollama service is not running ")
+            print(f"❌ Ollama service is not running ")
     except requests.exceptions.RequestException as e:
         return False
 
-def warm_up_model(model_name: str) -> bool:
+def warm_up_model(model: ChatOllama) -> bool:
     """Pre-load and warm up the specified model for optimal performance.
 
     Performs a simple test generation to cache the model in memory and verify
@@ -60,7 +74,7 @@ def warm_up_model(model_name: str) -> bool:
         Exception: When model invocation fails during warm-up process
     """
     try:
-        logger.info(f"🔥 Warming up and testing chat model: {model_name}")
+        print(f"🔥 Warming up and testing chat model: {model}")
         
         test_message = [HumanMessage(content="Hello")]
         response = model.invoke(test_message)
@@ -68,11 +82,13 @@ def warm_up_model(model_name: str) -> bool:
         if response:
             return True
         else:
-            logger.error(f"❌ Failed to warm up model {model_name}")
+            print(f"❌ Failed to warm up model {model}")
             return False
     except Exception as e:
-        logger.error(f"❌ Failed to warm up model {model_name}: {e}")
+        print(f"❌ Failed to warm up model {model}: {e}")
         return False
+
+
 
 def validate_startup_requirements(DEFAULT_OLLAMA_MODEL: str, DEFAULT_EMBEDDING_MODEL: str) -> bool:
     """Validate all system requirements before starting the application.
@@ -88,53 +104,110 @@ def validate_startup_requirements(DEFAULT_OLLAMA_MODEL: str, DEFAULT_EMBEDDING_M
     Returns:
         True if all requirements are met and application can start, False otherwise
     """
-    logger.info("🔍 Checking Ollama is running in the background...")
+    print("🔍 Checking Ollama is running in the background...")
 
     if not check_ollama_status(DEFAULT_OLLAMA_MODEL) or not check_ollama_status(DEFAULT_EMBEDDING_MODEL):
-        logger.error("❌ Ollama check failed on " + DEFAULT_OLLAMA_MODEL)
-        logger.error("🔧 Solutions:")
-        logger.error("   1. Start Ollama: ollama serve in a separate terminal")
-        logger.error("   2. Download model: ollama pull " + DEFAULT_OLLAMA_MODEL)
-        logger.error("   3. Verify with: ollama list")
+        print("❌ Ollama check failed on " + DEFAULT_OLLAMA_MODEL)
+        print("🔧 Solutions:")
+        print("   1. Start Ollama: ollama serve in a separate terminal")
+        print("   2. Download model: ollama pull " + DEFAULT_OLLAMA_MODEL)
+        print("   3. Verify with: ollama list")
         return False
 
-    logger.info("✅ Ollama is running")
+    print("✅ Ollama is running")
     return True
 
-def load_documents_tool():
-    return "Documents are already loaded and ready for queries."
 
-tools = [load_documents_tool]
+def setup_llm(DEFAULT_OLLAMA_MODEL: str, OLLAMA_BASE_URL: str) -> ChatOllama | None:
+    """Set up the LLM as a chat model and bind it with available tools.
 
-def setup_llm(DEFAULT_OLLAMA_MODEL: str, OLLAMA_BASE_URL: str) -> ChatOllama or None:
-        """Set up the LLM as a chat model and bind it with available tools.
+    Initializes Ollama chat model and configures model parameters for optimal performance.
 
-        Initializes either Ollama chat model 
-        binds the three available tools (load_documents, query_vectorstore, create_action_plan)
-        to enable tool calling functionality, and configures model parameters for optimal performance.
+    Args:
+        DEFAULT_OLLAMA_MODEL: Name of the Ollama model to use for chat
+        OLLAMA_BASE_URL: Base URL for the Ollama service
 
-        Args:
-            DEFAULT_OLLAMA_MODEL: Name of the Ollama model to use for chat
-            OLLAMA_BASE_URL: Base URL for the Ollama service
+    Returns:
+        ChatOllama model instance or None if setup fails
 
-        Returns:
-            Model or None
+    Raises:
+        Exception: When model initialization fails
+    """
+    try:
+        model_name = DEFAULT_OLLAMA_MODEL
 
-        Raises:
-            Exception: When model initialization or tool binding fails
-        """
-        try:
-            model_name = DEFAULT_OLLAMA_MODEL
+        model = ChatOllama(
+            model=model_name,
+            base_url=OLLAMA_BASE_URL,
+            temperature=0,
+            num_ctx=2048,  # Increased for better context handling
+            num_predict=512,  # Limit response length for faster generation
+            repeat_penalty=1.1,  # Reduce repetition
+            top_k=40,  # Limit vocabulary for faster sampling
+            top_p=0.9,  # Nucleus sampling for efficiency
+            keep_alive="5m",  # Keep model in memory longer
+        )
 
-            model = ChatOllama(
-                    model=model_name,
-                    base_url=OLLAMA_BASE_URL,
-                    temperature=0,
-                    num_ctx=1024,        # Reduce context window if not needed
-                ).bind_tools(tools)
+        return model
 
-            return model
+    except Exception as e:
+        print(f"Failed to setup LLM model: {e}")
+        return None
+        
+# Global variable to store vectorstore
+_vectorstore = None
 
-        except Exception as e:
-            print(f"Failed to setup LLM model: {e}")
-            return None
+@monitor_performance("load_documents")
+def load_documents() -> bool:
+    """Load documents and create vector embeddings.
+
+    Loads all .txt files from the documents directory, creates embeddings using
+    the configured embedding model, and stores them in an InMemoryVectorStore
+    for semantic search.
+
+    Returns:
+        True if documents were successfully loaded and vectorstore created, False otherwise
+
+    Raises:
+        Exception: When document loading or vectorstore creation fails
+    """
+    global _vectorstore
+
+    try:
+        print("🔧 Loading documents for embedding")
+
+        loader = DirectoryLoader(
+            documents_dir,
+            glob="*.txt",
+            loader_cls=TextLoader,
+            loader_kwargs={"encoding": "utf-8"}
+        )
+        documents = loader.load()
+
+        if not documents:
+            logger.warning(f"No documents found in {documents_dir}")
+            return False
+
+        print(f"✅ Loaded {len(documents)} documents:")
+        for document in documents:
+            print(f"📄 Source: {document.metadata['source']}")
+    except Exception as e:
+        print(f"Failed to load documents: {e}")
+        return False
+
+    try:
+        embeddings = OllamaEmbeddings(
+            model=DEFAULT_EMBEDDING_MODEL,
+            base_url=OLLAMA_BASE_URL
+        )
+        _vectorstore = InMemoryVectorStore.from_documents(documents, embeddings)
+
+        print(f"✅ Created InMemoryVectorStore from {len(documents)} documents with Ollama {DEFAULT_EMBEDDING_MODEL} embeddings")
+        return True
+    except Exception as e:
+        print(f"Failed to create vectorstore: {e}")
+        return False
+
+def get_vectorstore():
+    """Get the global vectorstore instance."""
+    return _vectorstore
