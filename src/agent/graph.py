@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Annotated, TypedDict
 
-from langchain_core.messages import AnyMessage, AIMessage, SystemMessage
+from langchain_core.messages import AnyMessage, AIMessage, SystemMessage, HumanMessage
 from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -95,22 +95,80 @@ def query_documents_tool(query: str) -> Dict[str, Any]:
             content = doc.page_content[:1000] + "..." if len(doc.page_content) > 1000 else doc.page_content
             response += f"{i}. {content}\n\n"
 
-        return {"messages": [AIMessage(content="Query tool: " + response)]}
+        return {"messages": [AIMessage(content=response)]}
     except Exception as e:
-        return {"messages": [AIMessage(content="No relevant results found.")]}
+        return {"messages": [AIMessage(content=f"Error querying documents: {str(e)}")]}
 
 def create_plan_tool(query: str) -> Dict[str, Any]:
-    """Create a plan based on the query and the documents. 
+    """Create a plan based on the query and the documents.
+
+    Generates a prioritized action plan by comparing policy documents with updates document.
+    Uses LLM to analyze differences and create structured recommendations.
 
     Args:
         query: Natural language query to search for differences in the policy and update documents
 
     Returns:
-        Dictionary containing the plan with chronological dates and action steps
+        Dictionary containing the plan with priority, target dates and action steps
     """
-    # TODO: Implement plan creation
-    plan = f"Action plan:/n from {query}"
-    return {"messages": [AIMessage(content="Plan tool: " + plan)]}
+    try:
+        # Get vectorstore from global state (should be loaded by initialise node)
+        vectorstore = get_vectorstore()
+        if not vectorstore:
+            # Try to load documents if not already loaded
+            if not load_documents():
+                return {"messages": [AIMessage(content="Failed to load documents. Please check document directory and try again.")]}
+            vectorstore = get_vectorstore()
+            if not vectorstore:
+                return {"messages": [AIMessage(content="Documents not available. Please ensure documents are properly loaded.")]}
+
+        # Search for relevant documents
+        docs = vectorstore.similarity_search(query, k=5)
+        if not docs:
+            return {"messages": [AIMessage(content="No relevant policy documents found for your query.")]}
+
+        # Create context from retrieved documents
+        context = "\n\n".join([f"Document: {doc.page_content}" for doc in docs])
+
+        # Create a simple, direct prompt
+        plan_prompt = f"""Based on the following policy documents, create a detailed action plan for: "{query}"
+
+POLICY DOCUMENTS:
+{context}
+
+Create a practical action plan with the following format:
+
+**Action Plan for: {query}**
+
+1. **Priority: [High/Medium/Low]**
+   - Target Date: [Specific date within next 30 days]
+   - Description: [Clear, actionable steps]
+   - Dependencies: [Prerequisites or blockers]
+   - Resources: [Required tools, approvals, or stakeholders]
+
+2. **Priority: [High/Medium/Low]**
+   - Target Date: [Specific date within next 30 days]
+   - Description: [Clear, actionable steps]
+   - Dependencies: [Prerequisites or blockers]
+   - Resources: [Required tools, approvals, or stakeholders]
+
+3. **Priority: [High/Medium/Low]**
+   - Target Date: [Specific date within next 30 days]
+   - Description: [Clear, actionable steps]
+   - Dependencies: [Prerequisites or blockers]
+   - Resources: [Required tools, approvals, or stakeholders]
+
+Focus on specific, actionable steps based on the actual policy content provided above."""
+
+        # Invoke LLM directly with the constructed prompt
+        response = llm.invoke([HumanMessage(content=plan_prompt)])
+
+        if not response or not response.content:
+            return {"messages": [AIMessage(content="Failed to generate action plan.")]}
+
+        return {"messages": [AIMessage(content=response.content)]}
+    except Exception as e:
+        return {"messages": [AIMessage(content=f"Error creating plan: {str(e)}")]}
 
 tools = [load_documents_tool, query_documents_tool, create_plan_tool]
 

@@ -1,0 +1,9 @@
+# langgraph.yaml
+worker:
+  enable_stats: false
+  
+queue:
+  enable_monitoring: false
+  
+telemetry:
+  enabled: false
