@@ -1,0 +1,94 @@
+{
+  "timestamp": "2025-09-22T13:21:10.123788",
+  "evaluation": {
+    "result": "PASSED",
+    "details": "Found 1 policy timeframes: ['48 hours']",
+    "execution_time_seconds": 108.09178948402405
+  },
+  "graph_info": {
+    "provider": "ollama",
+    "chat_model_name": "llama3.2:3b",
+    "temperature": 0,
+    "embedding_model_name": "nomic-embed-text:latest",
+    "base_url": "http://localhost:11434",
+    "num_ctx": 1024,
+    "graph_compiled": true,
+    "graph_type": "StateGraph",
+    "tools_available": [
+      "load_documents_tool",
+      "query_documents_tool"
+    ],
+    "workflow_type": "langgraph_stateful",
+    "state_fields": [
+      "messages",
+      "ollama_validated",
+      "documents_loaded",
+      "system_initialised",
+      "tool_calls"
+    ],
+    "graph_nodes": [
+      "should_initialise",
+      "initialise",
+      "assistant",
+      "tools"
+    ],
+    "conditional_edges": [
+      "should_initialise",
+      "assistant->tools_condition"
+    ],
+    "memory_enabled": false
+  },
+  "system": {
+    "python_version": "3.13.5",
+    "platform": "nt"
+  },
+  "performance": {
+    "timing": {
+      "total_execution_time": 112.40246939659119,
+      "initialization_time": 4.305377721786499,
+      "llm_response_time": 91.76136445999146,
+      "tool_execution_time": 0.0,
+      "document_loading_time": 16.325522661209106
+    },
+    "response_quality": {
+      "response_length_chars": 788,
+      "response_length_words": 119,
+      "expected_elements_found": 1,
+      "expected_elements_total": 2,
+      "completeness_score": 0.5
+    }
+  },
+  "technical": {
+    "resource_usage": {
+      "memory_peak_mb": 0.0,
+      "memory_start_mb": 0.0,
+      "memory_end_mb": 0.0,
+      "api_call_count": 2,
+      "document_count": 2,
+      "embedding_calls": 1,
+      "llm_calls": 1
+    },
+    "error_metrics": {
+      "error_count": 0,
+      "timeout_count": 0,
+      "recovery_attempts": 0,
+      "validation_failures": 0
+    }
+  },
+  "workflow": {
+    "execution_summary": {
+      "nodes_executed": [
+        "initialise",
+        "assistant"
+      ],
+      "node_execution_count": {
+        "initialise": 1,
+        "assistant": 1
+      },
+      "tools_used": [],
+      "tool_usage_count": {},
+      "state_transitions": 2,
+      "edge_traversals": []
+    }
+  }
+}
