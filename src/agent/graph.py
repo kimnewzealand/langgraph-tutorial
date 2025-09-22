@@ -98,7 +98,20 @@ def query_documents_tool(query: str) -> Dict[str, Any]:
     except Exception as e:
         return {"messages": [AIMessage(content="No relevant results found.")]}
 
-tools = [load_documents_tool, query_documents_tool]
+def create_plan_tool(query: str) -> Dict[str, Any]:
+    """Create a plan based on the query and the documents. 
+
+    Args:
+        query: Natural language query to search for differences in the policy and update documents
+
+    Returns:
+        Dictionary containing the plan with chronological dates and action steps
+    """
+    # TODO: Implement plan creation
+    plan = f"Action plan:/n from {query}"
+    return {"messages": [AIMessage(content="Plan tool: " + plan)]}
+
+tools = [load_documents_tool, query_documents_tool, create_plan_tool]
 
 llm = setup_llm(DEFAULT_OLLAMA_MODEL, OLLAMA_BASE_URL)
 if llm:
