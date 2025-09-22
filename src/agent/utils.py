@@ -7,16 +7,6 @@ from langchain_community.document_loaders import TextLoader, DirectoryLoader
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_ollama import OllamaEmbeddings
 
-try:
-    from src.agent.performance_monitor import monitor_performance, performance_monitor
-except ImportError:
-    # Fallback if performance monitor is not available
-    def monitor_performance(operation_name: str):
-        def decorator(func):
-            return func
-        return decorator
-    performance_monitor = None
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -157,7 +147,6 @@ def setup_llm(DEFAULT_OLLAMA_MODEL: str, OLLAMA_BASE_URL: str) -> ChatOllama | N
 # Global variable to store vectorstore
 _vectorstore = None
 
-@monitor_performance("load_documents")
 def load_documents() -> bool:
     """Load documents and create vector embeddings.
 

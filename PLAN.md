@@ -22,9 +22,12 @@ This repository demonstrates a modern LangGraph-powered intelligent policy compl
 - ✅ **`src/agent/utils.py`**: Utility functions for LLM setup, validation, and document loading
 - ✅ **`src/agent/evaluation_utils.py`**: Comprehensive evaluation framework for testing
 - ✅ **`src/agent/system_prompt.txt`**: Structured system prompt with tool orchestration guidelines
+- ✅ **ContextSchema**: System prompt loading from file with static method
 - ✅ **AgentState TypedDict**: Clean state management with proper type hints
+- ✅ **State-Based Initialization**: One-time system setup with conditional routing
 - ✅ **Startup Validation**: Ollama service and model availability checking
 - ✅ **Error Handling**: Graceful failure handling throughout the workflow
+- ✅ **LangGraph Studio Compatible**: No custom checkpointer for studio compatibility
 
 ### 🛠️ **Tool Implementation - REFACTORED**
 
@@ -45,67 +48,53 @@ This repository demonstrates a modern LangGraph-powered intelligent policy compl
 - **`setup_llm()`**: Initializes ChatOllama with proper configuration
 - **`load_documents()`**: Creates embeddings and vector store from document directory
 
-### 📊 **New LangGraph Workflow - COMPLETED**
+### 📊 **Current LangGraph Workflow**
 
-#### **Simplified StateGraph Architecture**
+#### **StateGraph Architecture with Initialization**
 ```
-START → llm_node → tools_condition → tools (if needed)
-          ↓                           ↓
-    System Prompt              Tool Execution
-    + User Message                    ↓
-          ↓                    Back to llm_node
-    LLM Processing                    ↓
-          ↓                    Final Response
-      Response/Tool Calls             ↓
-                                    END
+START → should_initialise → initialise (if needed) → assistant
+          ↓                      ↓                      ↓
+    Check system state    Load documents &         System Prompt
+    (documents_loaded,    validate Ollama         + User Message
+     ollama_validated,                                  ↓
+     system_initialised)                         LLM Processing
+          ↓                                            ↓
+    If already initialised                    Response/Tool Calls
+          ↓                                            ↓
+      assistant ←─────────────────────────────── tools_condition
+                                                       ↓
+                                                Tool Execution
+                                                       ↓
+                                                Back to assistant
+                                                       ↓
+                                                     END
 ```
 
 #### **AgentState Management**
 - **`messages`**: Annotated list of conversation messages with `add_messages`
-- **`ollama_validated`**: Boolean flag for startup validation status
+- **`ollama_validated`**: Boolean flag for Ollama service validation status
 - **`documents_loaded`**: Boolean flag for document loading status
+- **`system_initialised`**: Boolean flag for one-time system initialization
 - **`tool_calls`**: List of executed tool names for tracking
 
+#### **ContextSchema Integration**
+- **`system_prompt`**: TypedDict field for system prompt configuration
+- **`get_default_system_prompt()`**: Static method to load from `system_prompt.txt`
+
 #### **Key Architectural Benefits**
-- **Simplicity**: Clean, linear workflow with conditional tool execution
+- **One-Time Initialization**: System setup runs only once per session
+- **State-Based Routing**: Conditional edges based on initialization status
 - **Type Safety**: TypedDict state with proper type annotations
 - **Modularity**: Separated concerns across multiple files
+- **Studio Compatible**: No custom checkpointer for LangGraph Studio compatibility
+- **System Prompt**: Loaded from file via ContextSchema static method
 - **Testability**: Isolated functions enable comprehensive testing
 - **Maintainability**: Clear structure makes debugging and enhancement easier
-
-## 📈 **Performance Metrics & Status**
-- **Architecture**: ✅ REFACTORED (New modular structure with `src/agent/`)
-- **State Management**: ✅ IMPROVED (TypedDict with proper type hints)
-- **Tool Integration**: ✅ SIMPLIFIED (Function-based tools with clear interfaces)
-- **Validation**: ✅ ENHANCED (Startup requirements checking)
-- **Evaluation**: ✅ UPDATED (Compatible with new graph structure)
-- **Code Organization**: ✅ CLEAN (Separated concerns across multiple files)
-
-## 🚀 **Current Capabilities (New Architecture)**
-
-### ✅ **Modular Design**
-- **Clean Separation**: Graph definition, utilities, and evaluation in separate files
-- **Type Safety**: Proper TypedDict usage for state management
-- **Import Structure**: Organized imports with clear dependencies
-- **System Prompt**: External file for easy prompt engineering
-
-### ✅ **Enhanced Tool System**
-- **State Integration**: Tools can modify AgentState directly
-- **Validation Pipeline**: Startup requirements checking before execution
-- **Error Handling**: Graceful failure modes with informative messages
-- **Tool Binding**: Proper LLM tool binding with function definitions
-
-### ✅ **Improved Workflow**
-- **Linear Flow**: Simplified graph structure with conditional tool execution
-- **Message Handling**: Proper message annotation and state updates
-- **Tool Condition**: Built-in LangGraph tools_condition for routing
-- **State Persistence**: Maintained across tool executions
 
 ## 🎯 **Next Development Priorities**
 
 ### 🔧 **Tool Implementation Completion**
 - [ ] **Complete `query_documents_tool`**: Implement actual vector search functionality
-- [ ] **Vector Store Integration**: Connect document loading with query capabilities
 - [ ] **Retrieval Enhancement**: Add relevance scoring and result ranking
 - [ ] **Error Handling**: Robust error handling for document loading failures
 
@@ -122,28 +111,33 @@ START → llm_node → tools_condition → tools (if needed)
 - [ ] **Output Formatting**: Structured response formats (JSON, Markdown)
 
 ### 🔧 **System Improvements**
-- [ ] **Configuration Management**: Environment-based settings
 - [ ] **Logging Enhancement**: Structured logging with different levels
 - [ ] **Memory Optimization**: Efficient document and embedding storage
-- [ ] **API Interface**: REST API wrapper for the graph functionality
 
 ## 🏁 **Success Criteria**
 - ✅ **Modular Architecture**: Clean separation with `src/agent/` structure
 - ✅ **Type Safety**: Proper TypedDict state management
+- ✅ **State-Based Initialization**: One-time setup with conditional routing
+- ✅ **ContextSchema Integration**: System prompt loading from file
 - ✅ **Tool Integration**: Function-based tools with state modification
 - ✅ **Startup Validation**: Service and model availability checking
+- ✅ **LangGraph Studio Compatible**: No custom checkpointer conflicts
+- ✅ **Document Processing**: Complete vector store and querying implementation
 - ✅ **Evaluation Framework**: Updated testing compatible with new structure
-- [ ] **Complete Tool Implementation**: Functional document querying
 - [ ] **Comprehensive Testing**: Unit and integration test coverage
 - [ ] **Performance Optimization**: Efficient document processing and querying
 
-## 🔧 **Technical Stack (Updated)**
+## 🔧 **Technical Stack**
 - **Framework**: LangGraph 0.6.6 with StateGraph
 - **Architecture**: Modular design with `src/agent/` structure
+- **Initialization**: State-based one-time setup with conditional routing
+- **System Prompt**: ContextSchema with file-based loading
 - **LLM**: Local Ollama llama3.2:3b model
 - **Embeddings**: nomic-embed-text:latest (768 dimensions)
 - **Vector Store**: LangChain InMemoryVectorStore
 - **Document Processing**: LangChain DirectoryLoader + TextLoader
 - **Language**: Python 3.13.5 with proper type hints
 - **State Management**: TypedDict with Annotated fields
+- **Studio Integration**: LangGraph Studio compatible (no custom checkpointer)
+- **Development**: Local-only operation with Ollama backend
 

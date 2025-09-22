@@ -2,23 +2,18 @@
 
 ## 🎯 Use Case
 
-This repository demonstrates a **modern LangGraph-powered policy compliance assistant** with a clean, modular architecture. The system showcases advanced AI workflow patterns using local LLMs for document processing and compliance analysis.
+This repository demonstrates a **LangGraph-powered policy compliance assistant**.The system showcases workflow patterns using **offline, local LLMs** for document processing and compliance analysis.
 
 ### 🚀 **Key Features**
 
-1. **🏗️ Modular Architecture**: Clean separation of concerns with `src/agent/` structure
-2. **📄 Intelligent Document Processing**: Automatic loading and semantic search with vector embeddings
-3. **🔍 Precise Information Extraction**: Accurate extraction of policy details (e.g., data classification levels)
-4. **🤖 Stateful Workflows**: LangGraph StateGraph with proper state management and tool integration
+1. **UI Interface**: Agent with conversational UI using [LangGraph Studio](https://github.com/langchain-ai/langgraph-studio) which also acts as an IDE.
+2. **📄 Internal Document Processing**: Automatic loading and semantic search with vector embeddings using LangGraph in memory VectorStore
+4. **🤖 Stateful Workflows**: LangGraph StateGraph with state management, memory and tool integration
 5. **🔧 Tool Orchestration**: Function-based tools with validation and error handling
-6. **🏠 Local AI**: All processing runs locally using Ollama for privacy and cost efficiency
-7. **✅ Comprehensive Testing**: Built-in evaluation framework for quality assurance
+6. **🏠 Local Processing**: All processing runs locally using Ollama and downloaded LLMs for privacy and cost efficiency. There are no external API calls eg to Langraph API.
 
+### **File Structure**
 
-
-## 🏗️ **New Architecture Overview**
-
-### **Modular Structure**
 ```
 src/agent/
 ├── graph.py           # Main LangGraph StateGraph definition
@@ -28,11 +23,18 @@ src/agent/
 ```
 
 ### **LangGraph Workflow**
-The new architecture uses a simplified, linear workflow:
 
+The system implements a ReAct (Reasoning-Action) workflow pattern:
+- **Reasoning**: The agent analyzes the current state and user request
+- **Action**: Executes appropriate tools based on reasoning
+- **Observation**: Processes tool outputs and updates state
+- **Decision**: Determines next steps (continue with tools or provide final response)
+
+This cycle ensures systematic problem-solving with clear decision points and state tracking.
 ```mermaid
 graph LR
-    A[START] --> B[Assistant Node]
+    A[START] --> I[Initialise Node]
+    I --> B[Assistant Node]
     B --> C{Tools Condition}
     C -->|Tool Calls| D[Tools Node]
     C -->|No Tools| E[END]
@@ -40,12 +42,6 @@ graph LR
     B --> E
 ```
 
-### **Key Architectural Benefits**
-- **🧩 Modular Design**: Clean separation of graph definition, utilities, and evaluation
-- **📝 Type Safety**: Proper TypedDict usage for state management
-- **🔧 Function-Based Tools**: Simple, testable tool implementations
-- **✅ Startup Validation**: Comprehensive service and model checking
-- **🧪 Built-in Testing**: Evaluation framework for continuous quality assurance
 
 ### **LangGraph Core Concepts**
 - **Nodes**: Python functions that process state (assistant, tools)
@@ -67,31 +63,17 @@ graph LR
   - `documents_loaded`: Document loading status
   - `tool_calls`: Tool execution tracking
 
-### **🚀 Workflow Features**
-- **Startup Validation**: Comprehensive Ollama service and model availability checking
-- **Error Handling**: Graceful failure modes with informative error messages
-- **Tool Integration**: Seamless LLM tool binding with function-based implementations
-- **Vector Search**: Functional document querying with similarity search
-
 ### **🚀 Quick Start Example**
 
 ```bash
-# Run the new graph structure
+# Run the graph structure
 langgraph dev
 ```
 
-### **📊 Sample Workflow**
-1. **Startup Validation**: Checks service and model availability
-2. **Document Loading**: Automatically loads and embeds policy documents
-3. **Query Processing**: Semantic search through document content
-4. **Response Generation**: LLM processes results and generates responses
-5. **Evaluation**: Built-in testing validates system performance
-
-### **🎯 Expected Results**
-- **Document Loading**: Successfully processes `.txt` files from `documents/` directory
-- **Vector Search**: Functional similarity search with proper result formatting
-- **Information Extraction**: Correctly identifies data classification levels (Public, Internal, Confidential)
-- **Tool Integration**: Seamless LLM-tool interaction with proper state management
+```bash
+# Run the evaluation suite
+python src/agent/evaluation_utils.py
+```
 
 ## 🛠️ Setup
 ### **📋 Prerequisites**
@@ -131,14 +113,6 @@ Use Python 3.13
     ```bash
     pip install -r requirements.txt
     ```
-
-## 🧪 **Testing & Evaluation**
-
-The system includes comprehensive testing:
-- **Automated Tests**: `test_evaluation.py` validates system functionality
-- **Quality Metrics**: Tests information extraction accuracy
-- **Performance Monitoring**: Tracks response times and success rates
-- **Detailed Logging**: Results saved to `logs/` directory
 
 ### **Adding Documents**
 Place `.txt` files in the `documents/` directory. The system will automatically load and embed them.
