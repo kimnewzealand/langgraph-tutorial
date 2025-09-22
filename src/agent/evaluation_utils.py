@@ -374,7 +374,7 @@ def run_evaluation(custom_chat_model: str = None, custom_embedding_model: str = 
 
     try:
         logger.info("🧪 EVALUATION: Testing new graph structure with policy-specific query")
-        logger.info("🎯 Expected result: Agent should use tools to find specific timeframes (48 hours, 72 hours)")
+        logger.info("🎯 Expected result: Agent should return three levels, public, internal and confidential")
 
         # Start total timing
         metrics.start_timing("total")
@@ -414,7 +414,7 @@ def run_evaluation(custom_chat_model: str = None, custom_embedding_model: str = 
         # Create initial state with a query that should force tool usage
         # This query asks for specific company policy details that require document lookup
         initial_state: AgentState = {
-            "messages": [HumanMessage(content="What are the specific time requirements for LLM usage approval and AI content verification according to our company policies? Please provide exact timeframes.")],
+            "messages": [HumanMessage(content="List the data classification levels?")],
             "ollama_validated": False,
             "documents_loaded": False,
             "tool_calls": []
@@ -480,13 +480,16 @@ def run_evaluation(custom_chat_model: str = None, custom_embedding_model: str = 
                 # Check for specific policy timeframes that require document lookup
                 expected_timeframes = ["48 hours", "72 hours"]
                 timeframes_found = set()
-                if "48 hours" in response_content or "48-hour" in response_content:
-                    timeframes_found.add("48 hours")
-                if "72 hours" in response_content or "72-hour" in response_content:
-                    timeframes_found.add("72 hours")
+                if "internal" in response_content:
+                    timeframes_found.add("internal")
+                if "public" in response_content:
+                    timeframes_found.add("public")
+                if "confidential" in response_content:
+                    timeframes_found.add("confidential")
+
 
                 timeframe_count = len(timeframes_found)
-                logger.info(f"🔍 Policy timeframes found: {sorted(list(timeframes_found))}")
+                logger.info(f"🔍 Data Classification levels found: {sorted(list(timeframes_found))}")
 
                 # Record response quality metrics
                 metrics.record_response_quality(

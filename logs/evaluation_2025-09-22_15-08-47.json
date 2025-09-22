@@ -1,9 +1,9 @@
 {
-  "timestamp": "2025-09-22T13:21:10.123788",
+  "timestamp": "2025-09-22T15:08:47.305133",
   "evaluation": {
     "result": "PASSED",
-    "details": "Found 1 policy timeframes: ['48 hours']",
-    "execution_time_seconds": 108.09178948402405
+    "details": "Found 3 policy timeframes: ['confidential', 'internal', 'public']",
+    "execution_time_seconds": 93.29501485824585
   },
   "graph_info": {
     "provider": "ollama",
@@ -44,18 +44,18 @@
   },
   "performance": {
     "timing": {
-      "total_execution_time": 112.40246939659119,
-      "initialization_time": 4.305377721786499,
-      "llm_response_time": 91.76136445999146,
+      "total_execution_time": 97.48781681060791,
+      "initialization_time": 4.187497854232788,
+      "llm_response_time": 81.1128454208374,
       "tool_execution_time": 0.0,
-      "document_loading_time": 16.325522661209106
+      "document_loading_time": 12.174736738204956
     },
     "response_quality": {
-      "response_length_chars": 788,
-      "response_length_words": 119,
-      "expected_elements_found": 1,
+      "response_length_chars": 261,
+      "response_length_words": 42,
+      "expected_elements_found": 3,
       "expected_elements_total": 2,
-      "completeness_score": 0.5
+      "completeness_score": 1.5
     }
   },
   "technical": {

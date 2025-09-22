@@ -8,6 +8,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from src.agent.utils import setup_llm, validate_startup_requirements, load_documents, get_vectorstore
 
 DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
+# DEFAULT_OLLAMA_MODEL = "llama3.2:1b" # Using a smaller model doesn't pass the evaluation
 DEFAULT_EMBEDDING_MODEL = "nomic-embed-text:latest"
 OLLAMA_BASE_URL = "http://localhost:11434"
 
