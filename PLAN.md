@@ -20,8 +20,8 @@ This repository demonstrates a modern LangGraph-powered intelligent policy compl
 ### 🔧 **New Modular Architecture - COMPLETED**
 - ✅ **`src/agent/graph.py`**: Main LangGraph StateGraph definition with nodes and edges
 - ✅ **`src/agent/utils.py`**: Utility functions for LLM setup, validation, and document loading
-- ✅ **`src/agent/evaluation_utils.py`**: Comprehensive evaluation framework for testing
-- ✅ **`src/agent/system_prompt.txt`**: Structured system prompt with tool orchestration guidelines
+- ✅ **`src/agent/evaluation_utils.py`**: Comprehensive evaluation framework with detailed metrics
+- ✅ **`src/agent/system_prompt.txt`**: Generic system prompt with tool orchestration guidelines
 - ✅ **ContextSchema**: System prompt loading from file with static method
 - ✅ **AgentState TypedDict**: Clean state management with proper type hints
 - ✅ **State-Based Initialization**: One-time system setup with conditional routing
@@ -29,24 +29,40 @@ This repository demonstrates a modern LangGraph-powered intelligent policy compl
 - ✅ **Error Handling**: Graceful failure handling throughout the workflow
 - ✅ **LangGraph Studio Compatible**: No custom checkpointer for studio compatibility
 
-### 🛠️ **Tool Implementation - REFACTORED**
+### 📊 **Evaluation & Monitoring - COMPLETED**
+- ✅ **Comprehensive Metrics**: Performance timing, response quality, resource usage
+- ✅ **Standalone Evaluation**: Command-line evaluation suite with detailed logging
+- ✅ **Performance Analysis**: Accurate timing breakdown (initialization, LLM, document loading)
+- ✅ **API Call Tracking**: Embedding and LLM API call monitoring
+- ✅ **Quality Metrics**: Response completeness and accuracy scoring
+- ✅ **Workflow Analysis**: Node execution tracking and state transitions
+- ✅ **JSON Logging**: Structured evaluation results for analysis
 
-#### 1. **`load_documents_tool(state: AgentState)`**
+### 🛠️ **Tool Implementation - COMPLETED**
+
+#### 1. **`load_documents_tool(state: AgentState)`** ✅
 - **Type**: State-modifying function tool
 - **Purpose**: Load documents and update state with loading status
 - **Implementation**: Calls `load_documents()` from utils and updates `documents_loaded` state
 - **Returns**: Dictionary with AIMessage confirming document loading
 
-#### 2. **`query_documents_tool(query: str)`**
+#### 2. **`query_documents_tool(query: str)`** ✅
 - **Type**: Query function tool
 - **Purpose**: Semantic search through loaded policy documents
-- **Implementation**: Placeholder for vector search functionality
-- **Returns**: Dictionary with query results and metadata
+- **Implementation**: Full vector similarity search with relevance scoring
+- **Returns**: Dictionary with ranked query results and metadata
 
-#### 3. **System Integration Tools**
+#### 3. **`create_plan_tool(query: str)`** ✅
+- **Type**: Planning function tool
+- **Purpose**: Generate structured action plans based on policy documents
+- **Implementation**: RAG-based plan generation with document context
+- **Returns**: Dictionary with detailed action plan including priorities and timelines
+
+#### 4. **System Integration Tools** ✅
 - **`validate_startup_requirements()`**: Checks Ollama service and model availability
 - **`setup_llm()`**: Initializes ChatOllama with proper configuration
 - **`load_documents()`**: Creates embeddings and vector store from document directory
+- **`get_vectorstore()`**: Global vectorstore access for tool integration
 
 ### 📊 **Current LangGraph Workflow**
 
@@ -93,28 +109,22 @@ START → should_initialise → initialise (if needed) → assistant
 
 ## 🎯 **Next Development Priorities**
 
-### 🔧 **Tool Implementation Completion**
-- [ ] **Complete `query_documents_tool`**: Implement actual vector search functionality
-- [ ] **Retrieval Enhancement**: Add relevance scoring and result ranking
-- [ ] **Error Handling**: Robust error handling for document loading failures
-
 ### 🧪 **Testing & Validation**
 - [ ] **Unit Tests**: Individual function testing for utils and tools
 - [ ] **Integration Tests**: End-to-end workflow testing
-- [ ] **Performance Tests**: Benchmark document loading and query times
-- [ ] **Evaluation Enhancement**: More comprehensive evaluation scenarios
+- [ ] **Performance Tests**: Benchmark document loading and query times with different models
+- [ ] **Tool Usage Tests**: Verify actual tool calling vs. simulation
 
 ### 📊 **Feature Enhancements**
-- [ ] **Action Plan Tool**: Complete implementation of compliance planning
-- [ ] **Document Comparison**: Cross-document analysis capabilities
 - [ ] **Timeline Management**: Deadline extraction and chronological sorting
 - [ ] **Output Formatting**: Structured response formats (JSON, Markdown)
+- [ ] **Model Optimization**: Test with larger models for better tool calling
 
 ### 🔧 **System Improvements**
-
 - [ ] **State Management**: Use Pydantic for better state validation and management on runtime
 - [ ] **Logging Enhancement**: Structured logging with different levels
 - [ ] **Memory Optimization**: Efficient document and embedding storage
+- [ ] **Tool Call Reliability**: Improve LLM tool calling with better prompts or larger models
 
 ## 🏁 **Success Criteria**
 - ✅ **Modular Architecture**: Clean separation with `src/agent/` structure
@@ -126,8 +136,9 @@ START → should_initialise → initialise (if needed) → assistant
 - ✅ **LangGraph Studio Compatible**: No custom checkpointer conflicts
 - ✅ **Document Processing**: Complete vector store and querying implementation
 - ✅ **Evaluation Framework**: Updated testing compatible with new structure
+- ✅ **Performance Monitoring**: Comprehensive metrics and timing analysis
+- ✅ **Bug Resolution**: Critical issues identified and resolved
 - [ ] **Comprehensive Testing**: Unit and integration test coverage
-- [ ] **Performance Optimization**: Efficient document processing and querying
 
 ## 🔧 **Technical Stack**
 - **Framework**: LangGraph 0.6.6 with StateGraph
