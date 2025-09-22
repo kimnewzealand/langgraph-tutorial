@@ -111,6 +111,8 @@ START → should_initialise → initialise (if needed) → assistant
 - [ ] **Output Formatting**: Structured response formats (JSON, Markdown)
 
 ### 🔧 **System Improvements**
+
+- [ ] **State Management**: Use Pydantic for better state validation and management on runtime
 - [ ] **Logging Enhancement**: Structured logging with different levels
 - [ ] **Memory Optimization**: Efficient document and embedding storage
 
